@@ -1,16 +1,7 @@
 """
 DietSense Analytics Engine
-計算 BMR、TDEE、熱量估算範圍
+計算 BMR、TDEE、熱量估算範圍、巨量營養素
 """
-
-class UserProfile:
-    def __init__(self, age, gender, weight_kg, height_cm, activity_level, goal):
-        self.age = age
-        self.gender = gender
-        self.weight_kg = weight_kg
-        self.height_cm = height_cm
-        self.activity_level = activity_level  # sedentary/light/moderate/active/very_active
-        self.goal = goal  # lose/maintain/gain
 
 ACTIVITY_FACTORS = {
     "sedentary":   1.2,
@@ -20,57 +11,64 @@ ACTIVITY_FACTORS = {
     "very_active": 1.9,
 }
 
-def calculate_bmr(profile: UserProfile) -> float:
-    """Mifflin-St Jeor 公式"""
-    base = 10 * profile.weight_kg + 6.25 * profile.height_cm - 5 * profile.age
-    if profile.gender.lower() == "male":
-        return base + 5
-    else:
-        return base - 161
+class UserProfile:
+    def __init__(self, age=22, gender="female", weight_kg=60,
+                 height_cm=165, activity_level="moderate", goal="maintain"):
+        self.age            = age
+        self.gender         = gender
+        self.weight_kg      = weight_kg
+        self.height_cm      = height_cm
+        self.activity_level = activity_level
+        self.goal           = goal  # lose / maintain / gain
 
-def calculate_tdee(profile: UserProfile) -> float:
-    """TDEE = BMR × 活動係數"""
-    bmr = calculate_bmr(profile)
-    factor = ACTIVITY_FACTORS.get(profile.activity_level, 1.55)
-    return round(bmr * factor, 1)
+    def to_dict(self):
+        return self.__dict__
+
+
+def calculate_bmr(p: UserProfile) -> float:
+    base = 10 * p.weight_kg + 6.25 * p.height_cm - 5 * p.age
+    return base + 5 if p.gender.lower() == "male" else base - 161
+
+
+def calculate_tdee(p: UserProfile) -> float:
+    factor = ACTIVITY_FACTORS.get(p.activity_level, 1.55)
+    return round(calculate_bmr(p) * factor, 0)
+
+
+def calorie_goal(p: UserProfile) -> float:
+    tdee = calculate_tdee(p)
+    if p.goal == "lose":    return tdee - 500
+    if p.goal == "gain":    return tdee + 300
+    return tdee
+
 
 def estimate_calories(kcal_per_100g: float, portion_g: float,
-                      confidence: float) -> tuple:
-    """
-    計算熱量估算範圍
-    回傳 (low, point, high)
-    """
-    point = kcal_per_100g * portion_g / 100
-    uncertainty = (1 - confidence) * 0.5 + 0.1   # 最少 ±10%
-    margin = point * uncertainty
-    return round(point - margin), round(point), round(point + margin)
+                      confidence: float = 0.85) -> tuple[int, int, int]:
+    """回傳 (low, point, high) kcal"""
+    point   = kcal_per_100g * portion_g / 100
+    margin  = point * (0.10 + (1 - confidence) * 0.40)
+    return int(point - margin), int(point), int(point + margin)
 
-def compute_macro_ratios(entries: list) -> dict:
-    """計算巨量營養素佔比"""
-    total_protein = sum(e.get("protein_g", 0) for e in entries)
-    total_carb    = sum(e.get("carb_g",    0) for e in entries)
-    total_fat     = sum(e.get("fat_g",     0) for e in entries)
 
-    protein_kcal = total_protein * 4
-    carb_kcal    = total_carb    * 4
-    fat_kcal     = total_fat     * 9
-    total_kcal   = protein_kcal + carb_kcal + fat_kcal or 1
-
+def compute_macro_ratios(entries: list[dict]) -> dict:
+    p = sum(e.get("protein_g", 0) for e in entries)
+    c = sum(e.get("carb_g",    0) for e in entries)
+    f = sum(e.get("fat_g",     0) for e in entries)
+    total_kcal = p * 4 + c * 4 + f * 9 or 1
     return {
-        "protein_pct": round(protein_kcal / total_kcal * 100, 1),
-        "carb_pct":    round(carb_kcal    / total_kcal * 100, 1),
-        "fat_pct":     round(fat_kcal     / total_kcal * 100, 1),
+        "protein_pct": round(p * 4 / total_kcal * 100, 1),
+        "carb_pct":    round(c * 4 / total_kcal * 100, 1),
+        "fat_pct":     round(f * 9 / total_kcal * 100, 1),
+        "protein_g":   round(p, 1),
+        "carb_g":      round(c, 1),
+        "fat_g":       round(f, 1),
     }
 
-def safety_check(daily_kcal: float, profile: UserProfile) -> str:
-    """
-    回傳安全狀態：OK / WARNING / DANGER
-    """
-    min_safe = 1200 if profile.gender.lower() == "female" else 1500
-    if daily_kcal < min_safe:
+
+def safety_check(daily_kcal: float, p: UserProfile) -> str:
+    min_safe = 1200 if p.gender.lower() == "female" else 1500
+    if daily_kcal > 0 and daily_kcal < min_safe:
         return "DANGER"
-    tdee = calculate_tdee(profile)
-    if daily_kcal < tdee * 0.5:
+    if daily_kcal > 0 and daily_kcal < calculate_tdee(p) * 0.5:
         return "WARNING"
     return "OK"
-
