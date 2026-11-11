@@ -3,6 +3,11 @@
 > 本文件從 Proposal 階段開始建立，並在開發過程中持續更新。  
 > 目標：使任何人能透過本文件理解、執行、驗證並繼續開發此系統。
 
+**DIC3 更新（2026-11-11）：Openspec Refactor**
+- 新增 [`openspec.yaml`](./openspec.yaml)：完整 OpenAPI 3.1 規格，含 5 cores / 3 trade-offs / 10 details / 八大模組 workflow
+- 新增 [`docs/Introduction_refactor.md`](./docs/Introduction_refactor.md)：依 A2Z G–L 重構緒論
+- 新增 [`docs/RelatedWork_refactor.md`](./docs/RelatedWork_refactor.md)：依 A2Z M–O 重構相關研究
+
 ---
 
 ## Problem

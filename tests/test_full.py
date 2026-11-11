@@ -41,3 +41,4 @@ print('')
 print('All systems OK! DietSense is ready.')
 print('  Web UI -> python src/app.py')
 print('  CLI    -> python src/agent.py')
+

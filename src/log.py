@@ -86,3 +86,4 @@ def today_summary() -> dict:
         "fat_g":          round(sum(e["fat_g"]      for e in entries), 1),
         "meal_count":     len(entries),
     }
+

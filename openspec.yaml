@@ -1,0 +1,454 @@
+# DietSense — OpenSpec Workflow Specification
+# DIC3: Project Proposal Refactor using Openspec
+# Format: OpenAPI 3.1 extended with workflow annotations
+# Generated: 2026-11-11
+
+openapi: "3.1.0"
+
+info:
+  title: DietSense — Daily Calorie Intake Domain AI Agent
+  version: "1.0.0"
+  description: |
+    A conversational Domain AI Agent for daily calorie intake analysis.
+    Core: AI Agent + Nutrition Domain Knowledge + Data Analytics + Real-World Application
+  contact:
+    name: DietSense Team
+    url: https://github.com/yenyen0921/DietSense
+
+# ══════════════════════════════════════════════════════
+# A2Z ABSTRACT CORES (A–F)
+# ══════════════════════════════════════════════════════
+x-abstract:
+  A_attention: |
+    WHO 2025: 全球 10 億人口肥胖，飲食相關慢性病佔全球死亡 74%。
+    台灣衛福部 2025: 成人過重/肥胖率 47.9%，醫療支出逾 NT$500 億/年。
+    持續追蹤飲食者達成體重目標機率是未追蹤者 2 倍 (Teixeira, 2025)，
+    但 85% 使用者在 30 天內放棄現有工具 (Helander, 2014)。
+  B_but: |
+    現有工具三大限制：
+    1. 手動搜尋資料庫認知負擔過高（需專業營養知識）
+    2. 自報份量誤差達 18–54%，純 LLM 易產生幻覺無資料庫錨定
+    3. 西方為主資料庫嚴重缺乏台灣在地食物（夜市、小吃、複合料理）
+  C_cure: |
+    本專題提出 DietSense：一個整合多來源資料庫與 LLM 推理的
+    「對話式每日熱量分析 Domain AI Agent」，使用者只需以自然語言
+    描述飲食，系統自動解析、查詢、計算並追蹤。
+  D_development: |
+    整合技術：
+    - LLM（GPT-4o）：意圖分類、NER、Clarification Loop、工具調度
+    - RAG：USDA API + 台灣食品成分資料庫 + 自建向量庫
+    - Mifflin-St Jeor：個人化 TDEE/BMR 計算引擎
+    - 不確定性量化：輸出熱量區間（低~高），誠實傳達估算邊界
+  E_experiments: |
+    評估規劃：
+    - Dataset: 500 筆標註台式料理描述 + USDA + 衛福部資料庫
+    - Baseline: MyFitnessPal 手動輸入
+    - Metrics: ±20% 熱量準確率、記錄時間（秒）、SUS > 70
+    - Case Study: 20 位使用者連續 7 天追蹤飲食
+  F_findings: |
+    預期成果（Proposal 階段，尚未實驗，不虛構數據）：
+    - 熱量估算準確率（±20% margin）> 85%
+    - 食物記錄時間較手動縮短 60%
+    - SUS 可用性評分 > 70（Good）
+    - 台式食物辨識覆蓋率 > 90%
+
+# ══════════════════════════════════════════════════════
+# 5 CORE DESIGN PRINCIPLES（五個核心設計原則）
+# ══════════════════════════════════════════════════════
+x-five-cores:
+  core1:
+    name: 能量平衡為基（Energy Balance First）
+    principle: 攝取熱量 - 消耗熱量 = 體重變化，所有功能以此為錨點
+    system_impact: 同時追蹤攝取與計算個人 TDEE，提供有意義的缺口分析
+  core2:
+    name: 不確定性誠實量化（Honest Uncertainty Quantification）
+    principle: 份量估算是最大誤差來源，必須輸出區間而非偽精確單一數字
+    system_impact: 所有熱量輸出均為 (low, point, high) 三元組，依信心分數動態調整
+  core3:
+    name: 台灣在地化優先（Taiwan-First Localization）
+    principle: 西方資料庫嚴重缺乏台灣食物，本地化是核心競爭力
+    system_impact: 台灣食品成分資料庫 + 自建 60+ 台式料理 JSON 資料庫，優先於 USDA
+  core4:
+    name: 個體差異尊重（Individual Variation Respect）
+    principle: 相同食物對不同人效果不同，需個人化計算
+    system_impact: 收集年齡/性別/體重/身高/活動量，使用 Mifflin-St Jeor 個人化 TDEE
+  core5:
+    name: 安全守門機制（Safety Gating）
+    principle: AI 建議可能助長飲食失調，系統必須有安全邊界
+    system_impact: daily_kcal < 1200（女）/1500（男）→ 拒絕繼續限制建議，強制警示
+
+# ══════════════════════════════════════════════════════
+# 3 CORE TRADE-OFFS（三個核心取捨）
+# ══════════════════════════════════════════════════════
+x-three-tradeoffs:
+  tradeoff1:
+    name: 精確度 vs. 使用者體驗（Accuracy vs. UX）
+    tension: 詢問越多問題 → 估算越準確，但用戶越煩；問越少 → 更自然但不準確
+    decision: >
+      採用「信心分數門檻」動態策略：confidence > 80% 時直接記錄並告知範圍；
+      confidence < 80% 時才觸發澄清問題，且最多問 1 個最關鍵的問題
+    metric: 目標在 < 30 秒/餐 且 ±20% 準確率 > 85%
+  tradeoff2:
+    name: LLM 自由推理 vs. 資料庫錨定（LLM Hallucination vs. DB Grounding）
+    tension: 純 LLM 易捏造熱量數字；純資料庫無法理解自然語言複合描述
+    decision: >
+      RAG 混合架構：LLM 負責理解語意（NER、拆解複合料理），
+      資料庫負責提供事實熱量數字，兩者缺一不可
+    metric: 資料庫命中率 vs. 純 LLM 估算誤差率對比
+  tradeoff3:
+    name: 通用建議 vs. 高度個人化（Universal vs. Personalized）
+    tension: 通用 DRI 安全但無差異化；深度個人化有法規責任與隱私風險
+    decision: >
+      分層設計：無個人資料 → 使用 DRI 通用建議；
+      提供個人資料 → 啟用 Mifflin-St Jeor 個人化 TDEE；
+      明確法律免責聲明「本系統不能取代專業營養師診斷」
+    metric: 有無個人資料時的建議差異化程度 + 法律合規審查
+
+# ══════════════════════════════════════════════════════
+# 10 DETAIL SPECS（十個實作細節規格）
+# ══════════════════════════════════════════════════════
+x-ten-details:
+  detail1:
+    id: D01
+    name: 意圖分類（Intent Classification）
+    spec: >
+      四類意圖：log_food / query_nutrition / analyze / recommend
+      使用 LLM zero-shot 分類，預期準確率 > 95%
+    implementation: OpenAI function_calling 自動路由
+  detail2:
+    id: D02
+    name: 食物命名實體識別（Food NER）
+    spec: >
+      從自然語言抽取：{food_name, portion_desc, meal_type, timestamp}
+      處理模糊份量："一點點" → 50g（預設），"一碗" → 200g（查對照表）
+    implementation: LLM few-shot + portion_reference.json 對照表
+  detail3:
+    id: D03
+    name: 多來源資料庫查詢（Multi-DB Retrieval）
+    spec: >
+      優先序：台灣本地 JSON → USDA FoodData Central API → LLM 估算（最後手段）
+      模糊匹配：difflib.get_close_matches(cutoff=0.4)
+    implementation: src/retrieval.py
+  detail4:
+    id: D04
+    name: 熱量區間計算（Calorie Interval Estimation）
+    spec: >
+      point = kcal_per_100g × portion_g / 100
+      margin = point × (0.10 + (1 - confidence) × 0.40)
+      output: (low=point-margin, mid=point, high=point+margin)
+    implementation: src/analytics.py::estimate_calories()
+  detail5:
+    id: D05
+    name: 個人化 TDEE 計算（Personalized TDEE）
+    spec: >
+      Mifflin-St Jeor BMR:
+        Male:   10W + 6.25H - 5A + 5
+        Female: 10W + 6.25H - 5A - 161
+      TDEE = BMR × activity_factor
+      activity_factors: sedentary=1.2 / light=1.375 / moderate=1.55 / active=1.725
+    implementation: src/analytics.py::calculate_tdee()
+  detail6:
+    id: D06
+    name: 信心門檻與澄清迴圈（Confidence Threshold + Clarification Loop）
+    spec: >
+      IF confidence >= 0.80: 直接記錄，回報熱量區間
+      IF confidence < 0.80: 生成 1 個最關鍵澄清問題
+      最多 2 輪澄清；超過則使用預設值並標示 [估算]
+    implementation: src/agent.py agentic loop
+  detail7:
+    id: D07
+    name: 每日日誌持久化（Daily Log Persistence）
+    spec: >
+      SQLite 本地儲存，Schema:
+        (id, date, meal, name, portion_g, kcal_low, kcal_pt, kcal_high,
+         protein_g, carb_g, fat_g, source, created)
+      跨對話持久化，不因重啟遺失
+    implementation: src/log.py
+  detail8:
+    id: D08
+    name: 安全守門機制（Safety Gate）
+    spec: >
+      DANGER: daily_kcal < 1200（女）/ 1500（男）
+      WARNING: daily_kcal < TDEE × 0.5
+      DANGER 時：拒絕進一步限制建議，強制顯示警示，推薦諮詢營養師
+    implementation: src/analytics.py::safety_check()
+  detail9:
+    id: D09
+    name: 台灣在地食物資料庫（Taiwan Food Database）
+    spec: >
+      格式: JSON，60+ 台灣食物，欄位：
+        {kcal: 每100g熱量, protein: 蛋白質g, carb: 碳水g, fat: 脂肪g, unit: 標準單位}
+      覆蓋：夜市小吃、便當、飲料、傳統台菜
+    implementation: data/taiwan_food_db.json
+  detail10:
+    id: D10
+    name: Web UI 實時摘要（Real-time Dashboard）
+    spec: >
+      Gradio 雙欄介面：左側聊天，右側每日進度
+      右側顯示：進度條（eaten/goal）、巨量營養素、每筆記錄明細
+      使用者輸入後自動刷新右側摘要
+    implementation: src/app.py
+
+# ══════════════════════════════════════════════════════
+# SYSTEM WORKFLOW（八大模組流程）
+# ══════════════════════════════════════════════════════
+paths:
+  /agent/chat:
+    post:
+      summary: 主要對話入口
+      operationId: agentChat
+      description: |
+        接收用戶自然語言輸入，經 Planner Agent 協調，
+        呼叫適當工具，回傳結構化飲食分析與建議。
+      x-workflow:
+        step1:
+          module: "① User Interface"
+          input: 文字/語音輸入
+          output: normalized_query
+        step2:
+          module: "② Input Processor"
+          operations:
+            - language_normalize (繁簡/中英)
+            - intent_classify → {log_food, query, analyze, recommend}
+        step3:
+          module: "③ Planner & Reasoning Agent (LLM)"
+          operations:
+            - decompose_query_to_subtasks
+            - select_tools_via_function_calling
+            - manage_conversation_memory
+            - trigger_clarification_if_confidence_lt_0.8
+        step4:
+          module: "④ Data Acquisition / Retrieval"
+          operations:
+            - search_taiwan_db (priority 1)
+            - search_usda_api (priority 2)
+            - search_rag_vector_store (priority 3)
+        step5:
+          module: "⑤ Analytics Engine"
+          operations:
+            - estimate_calories → (low, point, high)
+            - compute_macros → {protein%, carb%, fat%}
+            - calculate_tdee → Mifflin-St-Jeor × activity
+            - quantify_uncertainty → confidence_interval
+        step6:
+          module: "⑥ Domain Knowledge Integration"
+          operations:
+            - apply_dietary_guidelines (DRI / Taiwan 每日飲食指南)
+            - lookup_portion_reference_table
+            - run_safety_check → {OK, WARNING, DANGER}
+        step7:
+          module: "⑦ Decision / Recommendation"
+          operations:
+            - compute_daily_gap (eaten vs goal_tdee)
+            - generate_food_substitution_suggestions
+            - generate_safety_alert_if_needed
+        step8:
+          module: "⑧ Output & Interaction"
+          output_format:
+            text: Markdown structured response
+            data: "{kcal_range, macros, tdee_gap, safety_status}"
+            visualization: 圓餅圖 (macros) + 進度條 (daily goal)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        "200":
+          description: 成功回應
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+
+  /food/search:
+    get:
+      summary: 食物營養查詢
+      operationId: searchFood
+      x-workflow:
+        step1: 接收食物名稱
+        step2: 台灣 DB 模糊匹配（difflib cutoff=0.4）
+        step3: 若無結果 → USDA API 查詢
+        step4: 回傳 (name, kcal_per_100g, protein, carb, fat, source, confidence)
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: 食物名稱（中文或英文）
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoodSearchResult'
+
+  /log/today:
+    get:
+      summary: 取得今日飲食日誌
+      operationId: getTodayLog
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailySummary'
+    post:
+      summary: 新增飲食記錄
+      operationId: addFoodEntry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FoodEntry'
+
+  /user/profile:
+    put:
+      summary: 更新個人資料（計算個人化 TDEE）
+      operationId: updateProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfile'
+
+# ══════════════════════════════════════════════════════
+# DATA SCHEMAS
+# ══════════════════════════════════════════════════════
+components:
+  schemas:
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          example: "我中午吃了一碗滷肉飯跟一個茶葉蛋"
+        user_id:
+          type: string
+
+    ChatResponse:
+      type: object
+      properties:
+        reply:
+          type: string
+        entries_logged:
+          type: array
+          items:
+            $ref: '#/components/schemas/FoodEntry'
+        daily_summary:
+          $ref: '#/components/schemas/DailySummary'
+        safety_status:
+          type: string
+          enum: [OK, WARNING, DANGER]
+
+    FoodEntry:
+      type: object
+      required: [meal, name, portion_g, kcal_low, kcal_pt, kcal_high]
+      properties:
+        meal:
+          type: string
+          enum: [早餐, 午餐, 晚餐, 點心, 宵夜]
+        name:
+          type: string
+        portion_g:
+          type: number
+        kcal_low:
+          type: integer
+        kcal_pt:
+          type: integer
+        kcal_high:
+          type: integer
+        protein_g:
+          type: number
+        carb_g:
+          type: number
+        fat_g:
+          type: number
+        source:
+          type: string
+          enum: [taiwan_db, usda, llm_estimate]
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    DailySummary:
+      type: object
+      properties:
+        total_kcal_low:
+          type: integer
+        total_kcal_pt:
+          type: integer
+        total_kcal_high:
+          type: integer
+        protein_g:
+          type: number
+        carb_g:
+          type: number
+        fat_g:
+          type: number
+        tdee:
+          type: number
+        goal_kcal:
+          type: number
+        gap_kcal:
+          type: number
+        safety_status:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/FoodEntry'
+
+    FoodSearchResult:
+      type: object
+      properties:
+        found:
+          type: boolean
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              kcal_per_100g:
+                type: number
+              protein_g:
+                type: number
+              carb_g:
+                type: type: number
+              fat_g:
+                type: number
+              unit:
+                type: string
+              source:
+                type: string
+              confidence:
+                type: number
+
+    UserProfile:
+      type: object
+      properties:
+        age:
+          type: integer
+          minimum: 10
+          maximum: 100
+        gender:
+          type: string
+          enum: [male, female]
+        weight_kg:
+          type: number
+        height_cm:
+          type: number
+        activity_level:
+          type: string
+          enum: [sedentary, light, moderate, active, very_active]
+        goal:
+          type: string
+          enum: [lose, maintain, gain]

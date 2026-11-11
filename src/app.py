@@ -144,3 +144,4 @@ if __name__ == "__main__":
     print("啟動 DietSense Web UI...")
     print("請開啟瀏覽器：http://localhost:7860")
     demo.launch(server_name="0.0.0.0", server_port=7860, share=False)
+
