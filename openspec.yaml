@@ -452,3 +452,4 @@ components:
         goal:
           type: string
           enum: [lose, maintain, gain]
+

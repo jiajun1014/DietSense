@@ -99,3 +99,4 @@
 5. **Proposed Scheme（提案設計）**：八大模組架構 ＋ Flowchart ＋ Pseudocode（詳見 openspec.yaml）
 6. **Evaluation Plan（評估規劃）**：Dataset、Baseline、Metrics、Case Study
 7. **References（參考文獻）**
+
