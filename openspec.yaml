@@ -422,7 +422,7 @@ components:
               protein_g:
                 type: number
               carb_g:
-                type: type: number
+                type: number
               fat_g:
                 type: number
               unit:

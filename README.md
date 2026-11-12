@@ -48,7 +48,7 @@ Output (文字 + 圖表 + 建議)
 
 ```bash
 # 1. Clone
-git clone https://github.com/<your-team>/DietSense.git
+git clone https://github.com/yenyen0921/DietSense.git
 cd DietSense
 
 # 2. 安裝套件
@@ -98,24 +98,32 @@ python src/app.py
 DietSense/
 ├── README.md
 ├── DESIGN.md              # 系統設計文件
+├── openspec.yaml          # OpenAPI 3.1 規格（DIC3 新增）
 ├── requirements.txt
 ├── .env.example
 ├── src/
-│   ├── agent.py           # 主 Agent
-│   ├── intent.py          # 意圖分類
-│   ├── ner.py             # 食物 NER
-│   ├── retrieval.py       # 資料庫查詢
-│   ├── analytics.py       # 熱量計算
-│   ├── knowledge.py       # 領域知識庫
-│   ├── safety.py          # 安全機制
-│   └── response.py        # 回應生成
+│   ├── agent.py           # 主 Agent（含意圖分類、NER、安全機制）
+│   ├── retrieval.py       # 資料庫查詢（USDA + 台灣食品 DB）
+│   ├── analytics.py       # 熱量計算 & TDEE & 安全檢查
+│   ├── log.py             # 飲食日誌持久化（SQLite）
+│   └── app.py             # Web UI（Gradio）
 ├── data/
-│   ├── taiwan_food_db.csv
-│   ├── portion_reference.json
-│   └── dietary_guidelines.json
+│   ├── taiwan_food_db.json       # 台灣食品成分資料庫
+│   └── portion_reference.json    # 份量對照表
+├── docs/
+│   ├── Introduction_refactor.md  # 緒論重構（A2Z G–L）
+│   ├── RelatedWork_refactor.md   # 相關研究重構（A2Z M–O）
+│   ├── Abstract_A_to_F.md        # A–F 六段式摘要完整版
+│   ├── Abstract_500.md           # 500 字專業摘要
+│   ├── Abstract_300.md           # 300 字精簡摘要
+│   ├── Abstract_IEEE_EN.md       # IEEE 英文 Abstract
+│   ├── DietSense_Infographic_A4_Landscape.png  # 資訊圖表
+│   └── DietSense_Infographic_A4_Landscape.pdf
+├── scratch/
+│   └── generate_infographic.py   # 圖表產生腳本
 └── tests/
-    ├── test_ner.py
-    └── test_analytics.py
+    ├── test_analytics.py
+    └── test_full.py
 ```
 
 ---

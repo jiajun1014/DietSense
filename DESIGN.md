@@ -286,38 +286,44 @@ def diet_agent(query: str, user: UserProfile, log: DailyLog):
 DietSense/
 ├── README.md
 ├── DESIGN.md
+├── openspec.yaml          # OpenAPI 3.1 規格（DIC3 新增）
 ├── requirements.txt
 ├── .env.example
 │
 ├── src/
-│   ├── agent.py          # 主 Agent 邏輯
-│   ├── intent.py         # 意圖分類
-│   ├── ner.py            # 食物命名實體識別
-│   ├── retrieval.py      # 資料庫查詢
-│   ├── analytics.py      # 熱量計算 & 分析
-│   ├── knowledge.py      # Domain 知識庫
-│   ├── safety.py         # 安全機制
-│   └── response.py       # 回應生成
+│   ├── agent.py          # 主 Agent（含意圖分類、NER、安全機制）
+│   ├── retrieval.py      # 資料庫查詢（USDA + 台灣食品 DB）
+│   ├── analytics.py      # 熱量計算 & TDEE & 安全檢查
+│   ├── log.py            # 飲食日誌持久化（SQLite）
+│   └── app.py            # Web UI（Gradio）
 │
 ├── data/
-│   ├── taiwan_food_db.csv       # 台灣食品成分資料庫
-│   ├── portion_reference.json   # 份量對照表
-│   └── dietary_guidelines.json  # 飲食建議規則
+│   ├── taiwan_food_db.json       # 台灣食品成分資料庫
+│   └── portion_reference.json    # 份量對照表
 │
-├── tests/
-│   ├── test_ner.py
-│   ├── test_analytics.py
-│   └── test_safety.py
+├── docs/
+│   ├── Introduction_refactor.md  # 緒論重構（A2Z G–L）
+│   ├── RelatedWork_refactor.md   # 相關研究重構（A2Z M–O）
+│   ├── Abstract_A_to_F.md        # A–F 六段式摘要完整版
+│   ├── Abstract_500.md           # 500 字專業摘要
+│   ├── Abstract_300.md           # 300 字精簡摘要
+│   ├── Abstract_IEEE_EN.md       # IEEE 英文 Abstract
+│   ├── DietSense_Infographic_A4_Landscape.png
+│   └── DietSense_Infographic_A4_Landscape.pdf
 │
-└── notebooks/
-    └── evaluation.ipynb  # 準確度評估
+├── scratch/
+│   └── generate_infographic.py   # 圖表產生腳本
+│
+└── tests/
+    ├── test_analytics.py
+    └── test_full.py
 ```
 
 ### How to Run
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/<your-team>/DietSense.git
+git clone https://github.com/yenyen0921/DietSense.git
 cd DietSense
 
 # 2. 安裝相依套件
@@ -361,5 +367,5 @@ python src/app.py  # 開啟 http://localhost:7860
 
 ---
 
-*最後更新：2026-11-03 | 版本：v0.1 (Proposal Stage)*
+*最後更新：2026-11-12 | 版本：v0.2 (DIC3 Refactor)*
 
